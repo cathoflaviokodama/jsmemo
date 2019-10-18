@@ -1,0 +1,17 @@
+-- Table: public.test
+
+-- DROP TABLE public.test;
+
+CREATE TABLE public.test
+(
+    id integer NOT NULL,
+    data text COLLATE pg_catalog."default" NOT NULL,
+    CONSTRAINT test_pkey PRIMARY KEY (id)
+)
+WITH (
+    OIDS = FALSE
+)
+TABLESPACE pg_default;
+
+ALTER TABLE public.test
+    OWNER to postgres;
