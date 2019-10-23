@@ -100,7 +100,13 @@ function add(data,callback) {
         client.connect();
         App.ready = true;
     }
-    data = ""+data;
+    var orig = data;
+    try {
+        data = JSON.stringify(orig);
+    
+    } catch(e) {
+        data = ""+orig;
+    }
     data = validString(data);
     var table = validTable("test");
     client.query(`SELECT MAX(id) FROM ${table}`, (err, res) => {
@@ -205,7 +211,7 @@ App.sandbox.remove = function(id,callback) {
     remove(id,callback);
 }
 
-async function defrag() {
+async function defrag(callback) {
     if(!App.ready) {
         client.connect();
         App.ready = true;
@@ -224,7 +230,7 @@ async function defrag() {
         cur : 0
     };
     var table = validTable("test");
-    
+    var map = [];
     console.log(sql);
     try {
         await client.query("BEGIN");
@@ -245,6 +251,7 @@ async function defrag() {
                     if( res3.rowCount == 0) {
                         throw new Error("ERR COUNT, NO NEXT");
                     } else if(res3.rowCount == 1) {
+                        map.push([res3.rows[0].min,algo.cur]);
                         sql = `UPDATE ${table} SET id = ${algo.cur} WHERE id = ${res3.rows[0].min}`;
                         console.log(sql);
                         var res4 = await client.query(sql);
@@ -258,22 +265,25 @@ async function defrag() {
                         throw new Error("ERR TOO MANY MINS");
                     }
                 } else {
+                    map.push([algo.cur,algo.cur]);
                     algo.cur++;
                 }
             }
             await client.query("COMMIT");
+            callback && callback (map);
         } else {
             throw new Error("unknown size of table");
         }
     } catch(e) {
         await client.query("ROLLBACK");
-        console.log(e);
     }
+    return null;
 }
 
 App.sandbox.defrag = function(callback) {
     defrag(callback);
 }
+
 function shell() {
     if(!App.shell) return;
     rl.question('>', (answer) => {
@@ -288,6 +298,5 @@ function shell() {
         else App.quit();
     });
 }
-
 shell();
 
