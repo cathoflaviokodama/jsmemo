@@ -6,6 +6,12 @@ const rl = readline.createInterface({
     input : process.stdin,
     output: process.stdout
 });
+function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 
 const client = new Client({
     user: 'postgres',
@@ -20,6 +26,7 @@ const App = {
     client : client,
     ready : false,
     sandbox : {
+        uuidv4 : uuidv4,
         require : require,
         console : console,
         JSON : JSON
@@ -103,8 +110,18 @@ function add(data,callback) {
     }
     var orig = data;
     try {
-        data = JSON.stringify(orig);
-    
+        var type = Object.prototype.toString.apply(data);
+        if(type == "[object Function]") {
+            var c = { proto : {} };
+            c.ctor = data.toString();
+            for(var key in data.prototype) {
+                c.proto[key] = data.prototype[key].toString();
+            }
+            c.typeTag = "d377563c-60db-4b6e-83ef-3b899d081ce9";
+            data = JSON.stringify(c);
+        } else {
+            data = JSON.stringify(orig);
+        }
     } catch(e) {
         data = ""+orig;
     }
@@ -153,6 +170,7 @@ function find(data,callback) {
                     }
                 }
             }
+
             if(callback) {
                 callback( ret );
             } else {
@@ -169,6 +187,34 @@ App.sandbox.find = (str,callback)=> {
     // 2 3 4
     find(""+str,callback);
 }
+
+
+function fn(key,callback) {
+    find(key,(rows) => { 
+        if(rows.length>0) {
+            try {
+                var json = JSON.parse(rows[0].data);  
+                if("typeTag" in json && json.typeTag == "d377563c-60db-4b6e-83ef-3b899d081ce9") {
+                    var a = null;
+                    eval("a = " + json.ctor);
+                    for(var key in json.proto) {
+                        eval("a.prototype." + key + "=" + json.proto[key]);
+                    }
+                    callback(a);
+                }
+            } catch(e) {
+
+            }
+        }
+    } )
+}
+
+App.sandbox.fn = (str,callback)=> {
+    // <10 >100
+    // 2 3 4
+    fn(""+str,callback);
+}
+
 
 function remove(id,callback) {
     if(!App.ready) {
