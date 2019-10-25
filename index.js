@@ -189,8 +189,8 @@ App.sandbox.find = (str,callback)=> {
 }
 
 
-function fn(key,callback) {
-    find(key,(rows) => { 
+function fn(mkey,callback) {
+    find(mkey,(rows) => { 
         if(rows.length>0) {
             try {
                 var json = JSON.parse(rows[0].data);  
@@ -200,7 +200,12 @@ function fn(key,callback) {
                     for(var key in json.proto) {
                         eval("a.prototype." + key + "=" + json.proto[key]);
                     }
-                    callback(a);
+                    if(!callback) {
+                        console.log(mkey);
+                        App.sandbox[mkey] = a;
+                    } else {
+                        callback(a);
+                    }
                 }
             } catch(e) {
 
