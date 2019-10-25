@@ -151,6 +151,55 @@ App.sandbox.add = (str)=>{
     add(str);
 }
 
+function addfn(name,ctor) {
+    if(!App.ready) {
+        client.connect();
+        App.ready = true;
+    }
+    try {
+        var type = Object.prototype.toString.apply(ctor);
+        if(type == "[object Function]") {
+            var c = { proto : {} };
+            c.name = name;
+            c.ctor = ctor.toString();
+            for(var key in ctor.prototype) {
+                c.proto[key] = ctor.prototype[key].toString();
+            }
+            c.typeTag = "7dfc168d-6542-4f99-8e25-a1f91fd0d1bc";
+            data = JSON.stringify(c);
+        } else {
+            throw "not function";
+        }
+    } catch(e) {
+        console.log(e);
+        throw e;
+    }
+
+    data = validString(data);
+    var table = validTable("test");
+    client.query(`SELECT MAX(id) FROM ${table}`, (err, res) => {
+        if(!err) {
+            id = parseInt( res.rows[0].max ) + 1;
+            client.query(`INSERT INTO ${table} (id,data) VALUES (${id},${data})`, (err, res) => {
+                if(!err) {
+                    console.log(res.rowCount==1?"INSERTED " + data:"FAIL");
+                } else {
+                    console.log(err);   
+                    App.state = 3n;
+                }
+            });
+        } else {
+            console.log(err);
+            App.state = 3n;
+        }
+    });
+}
+
+
+App.sandbox.addfn = (name,ctor) => {
+    addfn(name,ctor);
+}
+
 function find(data,callback) {
     if(!App.ready) {
         client.connect();
@@ -201,8 +250,33 @@ function fn(mkey,callback) {
                         eval("a.prototype." + key + "=" + json.proto[key]);
                     }
                     if(!callback) {
-                        console.log(mkey);
                         App.sandbox[mkey] = a;
+                        console.log(mkey + " loaded.");
+                        console.log(rows[0].data);
+                    } else {
+                        callback(a);
+                    }
+                } else if("typeTag" in json && json.typeTag == "7dfc168d-6542-4f99-8e25-a1f91fd0d1bc") {
+                    var a = null;
+                    eval("a = " + json.ctor);
+                    for(var key in json.proto) {
+                        eval("a.prototype." + key + "=" + json.proto[key]);
+                    }
+                    if(!callback) {
+                        var nparts = json.name.split(".");
+                        var p = App.sandbox;
+                        for(var x = 0; x < nparts.length-1;x++) {
+                            if(nparts[x] in p) {
+                                p = p[ nparts[x] ];
+                            } else {
+                                p[nparts[x]] = {};
+                                p = p[ nparts[x] ];
+                            }
+                        }
+                        p[ nparts[ nparts.length-1 ] ] = a;
+                        console.log(json.name + " loaded.");
+                        console.log(rows[0].data);
+
                     } else {
                         callback(a);
                     }
