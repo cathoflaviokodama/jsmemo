@@ -20,6 +20,7 @@ const App = {
     client : client,
     ready : false,
     sandbox : {
+        require : require,
         console : console,
         JSON : JSON
     },
